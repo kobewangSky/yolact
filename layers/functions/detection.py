@@ -68,7 +68,13 @@ class Detect(object):
 
             for batch_idx in range(batch_size):
                 decoded_boxes = decode(loc_data[batch_idx], prior_data)
-                result = self.detect(batch_idx, conf_preds, decoded_boxes, mask_data, inst_data)
+
+                conf_preds = conf_preds.repeat(2, 1, 1)
+                decoded_boxes = decoded_boxes.unsqueeze(0).repeat(2, 1, 1)
+                mask_data = mask_data.repeat(2, 1, 1)
+                #result = self.detect(batch_idx, conf_preds, decoded_boxes, mask_data, inst_data)
+
+                result = self.detect_batch( conf_preds, decoded_boxes, mask_data)
 
                 if result is not None and proto_data is not None:
                     result['proto'] = proto_data[batch_idx]
@@ -98,6 +104,7 @@ class Detect(object):
             if self.use_cross_class_nms:
                 boxes, masks, classes, scores = self.cc_fast_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
             else:
+                #print()
                 boxes, masks, classes, scores = self.fast_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
         else:
             boxes, masks, classes, scores = self.traditional_nms(boxes, masks, scores, self.nms_thresh, self.conf_thresh)
@@ -106,6 +113,33 @@ class Detect(object):
                 print('Warning: Cross Class Traditional NMS is not implemented.')
 
         return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
+
+    def detect_batch(self, conf_preds, decoded_boxes, mask_data):
+        cur_scores = conf_preds[:, 1:, :]
+        conf_scores, _ = torch.max(cur_scores, dim=1)
+
+        keep = (conf_scores > self.conf_thresh)
+
+        num_batches = conf_preds.size(0)
+        out = [None] * num_batches
+
+        # self.batched_nms(boxes, scores, iou_threshold):
+
+        for batch_idx in range(num_batches):
+            scores = cur_scores[batch_idx, :,keep[batch_idx]]
+            boxes = decoded_boxes[batch_idx, keep[batch_idx], :]
+            masks = mask_data[batch_idx, keep[batch_idx], :]
+
+            if boxes.size(0) == 0:
+                out[batch_idx] = {'box': torch.Tensor([]).cuda(), 'mask': torch.Tensor([]).cuda(),
+                                  'score': torch.Tensor([]).cuda()}
+                continue
+            boxes, masks, classes, scores = self.batch_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
+            if batch_idx == 0:
+                continue
+            return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
+
+        return out
 
 
     def cc_fast_nms(self, boxes, masks, scores, iou_threshold:float=0.5, top_k:int=200):
@@ -132,6 +166,33 @@ class Detect(object):
         # don't have a higher scoring box that would supress it in normal NMS.
         idx_out = idx[iou_max <= iou_threshold]
         
+        return boxes[idx_out], masks[idx_out], classes[idx_out], scores[idx_out]
+
+    def batch_nms(self, boxes, masks, scores, iou_threshold: float = 0.5, top_k: int = 200):
+        # Collapse all the classes into 1
+        scores, classes = scores.max(dim=0)
+
+        _, idx = scores.sort(0, descending=True)
+        idx = idx[:top_k]
+
+        boxes_idx = boxes[idx]
+
+        # Compute the pairwise IoU between the boxes
+        iou = jaccard(boxes_idx, boxes_idx)
+
+        # Zero out the lower triangle of the cosine similarity matrix and diagonal
+        iou.triu_(diagonal=1)
+
+        # Now that everything in the diagonal and below is zeroed out, if we take the max
+        # of the IoU matrix along the columns, each column will represent the maximum IoU
+        # between this element and every element with a higher score than this element.
+        iou_max, _ = torch.max(iou, dim=0)
+
+
+        # Now just filter out the ones greater than the threshold, i.e., only keep boxes that
+        # don't have a higher scoring box that would supress it in normal NMS.
+        idx_out = idx[iou_max <= iou_threshold]
+
         return boxes[idx_out], masks[idx_out], classes[idx_out], scores[idx_out]
 
     def fast_nms(self, boxes, masks, scores, iou_threshold:float=0.5, top_k:int=200, second_threshold:bool=False):
