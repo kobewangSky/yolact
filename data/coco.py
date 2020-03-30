@@ -73,7 +73,7 @@ class COCODetection(data.Dataset):
         self.root = image_path
         self.coco = COCO(info_file)
         
-        self.ids = list(self.coco.imgToAnns.keys())
+        self.ids = list(self.coco.getImgIds(catIds=[1]))
         if len(self.ids) == 0 or not has_gt:
             self.ids = list(self.coco.imgs.keys())
         
@@ -115,6 +115,17 @@ class COCODetection(data.Dataset):
             target = [x for x in self.coco.loadAnns(ann_ids) if x['image_id'] == img_id]
         else:
             target = []
+            
+        for i in range(len(target)-1, -1, -1):
+            if 'bbox' in target[i]:
+                label_idx = target[i]['category_id']
+                if label_idx != 1:
+                    target.remove(target[i])
+
+
+
+        if len(target) is 0:
+            return None, None, None, None, None, None
 
         # Separate out crowd annotations. These are annotations that signify a large crowd of
         # objects of said class, where there is no annotation for each individual object. Both
@@ -164,7 +175,7 @@ class COCODetection(data.Dataset):
                 
                 target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
             else:
-                img, _, _, _ = self.transform(img, np.zeros((1, height, width), dtype=np.float), np.array([[0, 0, 1, 1]]),
+                img, _, _, _ = self.transform(img, np.zeros((1, height, width), dtype=np.float), np.array([[0.0, 0.0, 1.0, 1.0]]),
                     {'num_crowds': 0, 'labels': np.array([0])})
                 masks = None
                 target = None
@@ -276,6 +287,8 @@ def detection_collate(batch):
     num_crowds = []
 
     for sample in batch:
+        if sample[0] == None:
+            continue
         imgs.append(sample[0])
         targets.append(torch.FloatTensor(sample[1][0]))
         masks.append(torch.FloatTensor(sample[1][1]))

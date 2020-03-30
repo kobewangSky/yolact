@@ -30,6 +30,7 @@ RUN pip install Cython\
 && pip install pycocotools\
 && pip install torchsummary
 
+
 RUN export PATH=$PATH:/usr/local/cuda/bin
 
 #docker run --shm-size 24G -v Yolact:/root/Yolact/ --gpus all -it -p 8888:22  --name yolact yolact
