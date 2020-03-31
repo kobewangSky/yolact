@@ -28,7 +28,8 @@ RUN pip install Cython\
 && pip install wandb\
 && pip install opencv-python\
 && pip install pycocotools\
-&& pip install torchsummary
+&& pip install torchsummary\
+&& pip install gdown
 
 
 RUN export PATH=$PATH:/usr/local/cuda/bin

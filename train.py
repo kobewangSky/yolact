@@ -20,6 +20,9 @@ import torch.utils.data as data
 import numpy as np
 import argparse
 import datetime
+import wandb
+
+
 
 # Oof
 import eval as eval_script
@@ -96,6 +99,8 @@ if args.autoscale and args.batch_size != 8:
     cfg.lr *= factor
     cfg.max_iter //= factor
     cfg.lr_steps = [x // factor for x in cfg.lr_steps]
+
+wandb.init(project="yolact", config={"batch_size": args.batch_size})
 
 # Update training parameters from the config if necessary
 def replace(name):
@@ -185,6 +190,9 @@ def train():
 
     # Parallel wraps the underlying module, but when saving and loading we don't want that
     yolact_net = Yolact()
+
+    wandb.watch(yolact_net)
+
     net = yolact_net
     net.train()
 
@@ -308,10 +316,11 @@ def train():
                 
                 losses = { k: (v).mean() for k,v in losses.items() } # Mean here because Dataparallel
                 loss = sum([losses[k] for k in losses])
-                
+
+                wandb.log({"itr_Loss": loss})
+
                 # no_inf_mean removes some components from the loss, so make sure to backward through all of it
                 # all_loss = sum([v.mean() for v in losses.values()])
-
                 # Backprop
                 loss.backward() # Do this to free up vram even if loss is not finite
                 if torch.isfinite(loss).item():
@@ -337,7 +346,7 @@ def train():
                     
                     print(('[%3d] %7d ||' + (' %s: %.3f |' * len(losses)) + ' T: %.3f || ETA: %s || timer: %.3f')
                             % tuple([epoch, iteration] + loss_labels + [total, eta_str, elapsed]), flush=True)
-
+                    wandb.log({"Avg_Loss": loss_labels})
                 if args.log:
                     precision = 5
                     loss_info = {k: round(losses[k].item(), precision) for k in losses}
@@ -368,10 +377,10 @@ def train():
             # This is done per epoch
             if args.validation_epoch > 0:
                 if epoch % args.validation_epoch == 0 and epoch > 0:
-                    compute_validation_map(epoch, iteration, yolact_net, val_dataset, log if args.log else None)
+                    compute_validation_map(epoch, iteration, yolact_net, val_dataset, log if args.log else None, wandb)
         
         # Compute validation mAP after training is finished
-        compute_validation_map(epoch, iteration, yolact_net, val_dataset, log if args.log else None)
+        compute_validation_map(epoch, iteration, yolact_net, val_dataset, log if args.log else None, wandb)
     except KeyboardInterrupt:
         if args.interrupt:
             print('Stopping early. Saving network...')
@@ -482,7 +491,7 @@ def compute_validation_loss(net, data_loader, criterion):
         loss_labels = sum([[k, losses[k]] for k in loss_types if k in losses], [])
         print(('Validation ||' + (' %s: %.3f |' * len(losses)) + ')') % tuple(loss_labels), flush=True)
 
-def compute_validation_map(epoch, iteration, yolact_net, dataset, log:Log=None):
+def compute_validation_map(epoch, iteration, yolact_net, dataset, log:Log=None, wandb = None):
     with torch.no_grad():
         yolact_net.eval()
         
@@ -494,6 +503,8 @@ def compute_validation_map(epoch, iteration, yolact_net, dataset, log:Log=None):
 
         if log is not None:
             log.log('val', val_info, elapsed=(end - start), epoch=epoch, iter=iteration)
+            if wandb is not None:
+                wandb.log({"Box Accuracy": val_info['box']['all'], "Mask Accuracy": val_info['mask']['all'] })
 
         yolact_net.train()
 
