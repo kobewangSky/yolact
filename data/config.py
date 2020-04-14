@@ -28,7 +28,7 @@ COLORS = ((244,  67,  54),
 MEANS = (103.94, 116.78, 123.68)
 STD   = (57.38, 57.12, 58.40)
 
-COCO_CLASSES = ('person')
+COCO_CLASSES = ['person']
 
 COCO_LABEL_MAP = { 1:  1}
 
@@ -91,7 +91,7 @@ dataset_base = Config({
     'train_info':   'path_to_annotation_file',
 
     # Validation images and annotations.
-    'valid_images': './data/coco/images/',
+    'valid_images': './data/evaluation/images/',
     'valid_info':   'path_to_annotation_file',
 
     # Whether or not to load GT. If this is False, eval.py quantitative evaluation won't work.
@@ -138,6 +138,15 @@ coco2017_testdev_dataset = dataset_base.copy({
 
     'valid_info': './data/coco/annotations/image_info_test-dev2017.json',
     'has_gt': False,
+
+    'label_map': COCO_LABEL_MAP
+})
+
+StoreEvaluation = dataset_base.copy({
+    'name': 'Store Evaluation',
+
+    'train_info': './data/coco/annotations/instances_train2017.json',
+    'valid_info': './data/evaluation/annotations/StoreEvaluation.json',
 
     'label_map': COCO_LABEL_MAP
 })
@@ -644,8 +653,8 @@ yolact_base_config = coco_base_config.copy({
     'name': 'yolact_base',
 
     # Dataset stuff
-    'dataset': coco2017_dataset,
-    'num_classes': len(coco2017_dataset.class_names) + 1,
+    'dataset': StoreEvaluation,
+    'num_classes': len(StoreEvaluation.class_names) + 1,
 
     # Image Size
     'max_size': 550,

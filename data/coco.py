@@ -123,10 +123,6 @@ class COCODetection(data.Dataset):
                     target.remove(target[i])
 
 
-
-        if len(target) is 0:
-            return None, None, None, None, None, None
-
         # Separate out crowd annotations. These are annotations that signify a large crowd of
         # objects of said class, where there is no annotation for each individual object. Both
         # during testing and training, consider these crowds as neutral.
