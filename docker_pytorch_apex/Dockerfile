@@ -31,7 +31,12 @@ RUN pip install Cython\
 && pip install torchsummary\
 && pip install gdown
 
+RUN \
+   echo 'alias python="/opt/conda/bin/python3"' >> /root/.bashrc && \
+   #echo 'alias pip="/usr/bin/pip3"' >> /root/.bashrc && \
+   source /root/.bashrc
+
 
 RUN export PATH=$PATH:/usr/local/cuda/bin
 
-#docker run --shm-size 24G -v Yolact:/root/Yolact/ --gpus all -it -p 8888:22  --name yolact yolact
+#docker_pytorch run --shm-size 24G -v Yolact:/root/Yolact/ --gpus all -it -p 8888:22  --name yolact yolact
