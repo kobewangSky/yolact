@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-runtime
+FROM pytorch/pytorch:nightly-devel-cuda10.0-cudnn7
 
 RUN apt-get update\
 && apt-get install -y openssh-server\
@@ -15,7 +15,7 @@ RUN apt-get update\
 
 RUN mkdir /var/run/sshd\
 && echo 'root:password' | chpasswd\
-&& sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config\
+&& sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config\
 && sed -i 's/\/usr\/lib\/openssh\/sftp-server/internal-sftp/' /etc/ssh/sshd_config\
 && sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd\
 && echo "export VISIBLE=now" >> /etc/profile
@@ -31,10 +31,11 @@ RUN pip install Cython\
 && pip install torchsummary\
 && pip install gdown
 
+
 RUN \
    echo 'alias python="/opt/conda/bin/python3"' >> /root/.bashrc && \
-   #echo 'alias pip="/usr/bin/pip3"' >> /root/.bashrc && \
-   source /root/.bashrc
+   echo 'alias pip="/opt/conda/bin/pip"' >> /root/.bashrc
+
 
 
 RUN export PATH=$PATH:/usr/local/cuda/bin

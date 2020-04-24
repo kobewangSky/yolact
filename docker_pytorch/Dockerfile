@@ -28,12 +28,13 @@ RUN pip install Cython\
 && pip install wandb\
 && pip install opencv-python\
 && pip install pycocotools\
+&& pip install torchvision\
 && pip install torchsummary\
 && pip install gdown
 
 RUN \
    echo 'alias python="/opt/conda/bin/python3"' >> /root/.bashrc && \
-   #echo 'alias pip="/usr/bin/pip3"' >> /root/.bashrc && \
+   echo 'alias pip="/opt/conda/bin/pip"' >> /root/.bashrc && \
    source /root/.bashrc
 
 RUN export PATH=$PATH:/usr/local/cuda/bin

@@ -5,22 +5,26 @@ import pickle
 from collections import OrderedDict
 
 try:
-    from dcn_v2 import DCN
+    from dcn_v2 import DCN, set_amp
 except ImportError:
     def DCN(*args, **kwdargs):
         raise Exception('DCN could not be imported. If you want to use YOLACT++ models, compile DCN. Check the README for instructions.')
+
+def set_amp(amp):
+    global use_amp
+    use_amp = amp
 
 class Bottleneck(nn.Module):
     """ Adapted from torchvision.models.resnet """
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, norm_layer=nn.BatchNorm2d, dilation=1, use_dcn=False):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, norm_layer=nn.BatchNorm2d, dilation=1, use_dcn=False, use_amp = False):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False, dilation=dilation)
         self.bn1 = norm_layer(planes)
         if use_dcn:
             self.conv2 = DCN(planes, planes, kernel_size=3, stride=stride,
-                                padding=dilation, dilation=dilation, deformable_groups=1)
+                                padding=dilation, dilation=dilation, deformable_groups=1, use_amp=use_amp,)
             self.conv2.bias.data.zero_()
             self.conv2.conv_offset_mask.weight.data.zero_()
             self.conv2.conv_offset_mask.bias.data.zero_()
@@ -153,9 +157,9 @@ class ResNetBackbone(nn.Module):
         # Note: Using strict=False is berry scary. Triple check this.
         self.load_state_dict(state_dict, strict=False)
 
-    def add_layer(self, conv_channels=1024, downsample=2, depth=1, block=Bottleneck):
+    def add_layer(self, conv_channels=1024, downsample=2, depth=1, block=Bottleneck, use_amp=False):
         """ Add a downsample layer to the backbone as per what SSD does. """
-        self._make_layer(block, conv_channels // block.expansion, blocks=depth, stride=downsample)
+        self._make_layer(block, conv_channels // block.expansion, blocks=depth, stride=downsample, use_amp=use_amp)
 
 
 
@@ -446,14 +450,18 @@ class VGGBackbone(nn.Module):
                 
 
 
-def construct_backbone(cfg):
+def construct_backbone(cfg, use_amp):
     """ Constructs a backbone given a backbone config object (see config.py). """
+    set_amp(use_amp)
     backbone = cfg.type(*cfg.args)
 
     # Add downsampling layers until we reach the number we need
     num_layers = max(cfg.selected_layers) + 1
 
     while len(backbone.layers) < num_layers:
-        backbone.add_layer()
+        if cfg.use_amp:
+            backbone.add_layer(cfg.use_amp)
+        else:
+            backbone.add_layer()
 
     return backbone

@@ -592,11 +592,20 @@ def badhash(x):
     x =  ((x >> 16) ^ x) & 0xFFFFFFFF
     return x
 
+inf_time = []
+
 def evalimage(net:Yolact, path:str, save_path:str=None):
+    global inf_time
     frame = torch.from_numpy(cv2.imread(path)).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
-    preds = net(batch)
-
+    batch = batch.half()
+    net = net.half()
+    import time
+    tStart = time.time()  # 計時開始
+    for i in range(1000):
+        preds = net(batch)
+    tEnd = time.time()
+    print((tEnd - tStart)/1000)
     img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
     
     if save_path is None:
@@ -610,6 +619,7 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
         cv2.imwrite(save_path, img_numpy)
 
 def evalimages(net:Yolact, input_folder:str, output_folder:str):
+    global inf_time
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
@@ -623,6 +633,7 @@ def evalimages(net:Yolact, input_folder:str, output_folder:str):
         evalimage(net, path, out_path)
         print(path + ' -> ' + out_path)
     print('Done.')
+    print("inference time {}".format((sum(inf_time) - inf_time[0]) /(len(inf_time) -1)  ))
 
 from multiprocessing.pool import ThreadPool
 from queue import Queue
@@ -946,6 +957,10 @@ def evaluate(net:Yolact, dataset, train_mode=False):
                     batch = batch.cuda()
 
             with timer.env('Network Extra'):
+
+                batch = batch.half()
+                net = net.half()
+
                 preds = net(batch)
             # Perform the meat of the operation here depending on our mode.
             if args.display:
@@ -1101,6 +1116,7 @@ if __name__ == '__main__':
 
         if args.cuda:
             net = net.cuda()
+
 
         evaluate(net, dataset)
 

@@ -145,7 +145,7 @@ coco2017_testdev_dataset = dataset_base.copy({
 StoreEvaluation = dataset_base.copy({
     'name': 'Store Evaluation',
 
-    'train_info': './data/coco/annotations/instances_train2017.json',
+    'train_info': './data/coco/annotations/Virtualdata_V1_instances_train2017_.json',
     'valid_info': './data/evaluation/annotations/StoreEvaluation.json',
 
     'label_map': COCO_LABEL_MAP
@@ -641,6 +641,8 @@ coco_base_config = Config({
     'rescore_mask': False,
     'rescore_bbox': False,
     'maskious_to_train': -1,
+    # Additional Settings
+    "use_amp": False,
 })
 
 
@@ -744,6 +746,10 @@ yolact_resnet50_config = yolact_base_config.copy({
         'preapply_sqrt': False,
         'use_square_anchors': True, # This is for backward compatability with a bug
     }),
+})
+
+yolact_apex = yolact_base_config.copy({
+    'name': 'yolact_apex',
 })
 
 

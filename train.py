@@ -21,11 +21,21 @@ import numpy as np
 import argparse
 import datetime
 import wandb
+from apex import amp
 
 
 
 # Oof
 import eval as eval_script
+
+from comet_ml import Experiment
+
+hyper_params = {
+    "batch_size": 100,
+    "learning_rate": 0.001
+}
+
+# APEX Automated Mix Precision for 16 bit computation
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -84,6 +94,10 @@ parser.add_argument('--no_autoscale', dest='autoscale', action='store_false',
 
 parser.set_defaults(keep_latest=False, log=True, log_gpu=False, interrupt=True, autoscale=True)
 args = parser.parse_args()
+
+# args.batch_size = hyper_params['batch_size']
+# args.lr = hyper_params['learning_rate']
+
 
 if args.config is not None:
     set_cfg(args.config)
@@ -145,7 +159,7 @@ class NetLoss(nn.Module):
 
         self.net = net
         self.criterion = criterion
-    
+
     def forward(self, images, targets, masks, num_crowds):
         preds = self.net(images)
         losses = self.criterion(self.net, preds, targets, masks, num_crowds)
@@ -181,6 +195,7 @@ def train():
     dataset = COCODetection(image_path=cfg.dataset.train_images,
                             info_file=cfg.dataset.train_info,
                             transform=SSDAugmentation(MEANS))
+    print("train_data {}".format(cfg.dataset.train_info))
     
     if args.validation_epoch > 0:
         setup_eval()
@@ -188,10 +203,12 @@ def train():
                                     info_file=cfg.dataset.valid_info,
                                     transform=BaseTransform(MEANS))
 
+    print("eval_data {}".format(cfg.dataset.valid_info))
+
     # Parallel wraps the underlying module, but when saving and loading we don't want that
     yolact_net = Yolact()
 
-    wandb.watch(yolact_net)
+    #wandb.watch(yolact_net)
 
     net = yolact_net
     net.train()
@@ -227,15 +244,31 @@ def train():
                              neg_threshold=cfg.negative_iou_threshold,
                              negpos_ratio=cfg.ohem_negpos_ratio)
 
+
+
+
+
     if args.batch_alloc is not None:
         args.batch_alloc = [int(x) for x in args.batch_alloc.split(',')]
         if sum(args.batch_alloc) != args.batch_size:
             print('Error: Batch allocation (%s) does not sum to batch size (%s).' % (args.batch_alloc, args.batch_size))
             exit(-1)
-
-    net = CustomDataParallel(NetLoss(net, criterion))
     if args.cuda:
         net = net.cuda()
+    # apex
+    if cfg.use_amp:
+        from apex import amp
+
+        if not args.cuda:
+            raise ValueError("amp must be used with CUDA")
+        net, optimizer = amp.initialize(net, optimizer, opt_level="O0")
+
+        torch.nn.DataParallel(net, )
+    net = CustomDataParallel(NetLoss(net, criterion))
+
+
+
+
     
     # Initialize everything
     if not cfg.freeze_bn: yolact_net.freeze_bn() # Freeze bn so we don't kill our means
@@ -317,12 +350,16 @@ def train():
                 losses = { k: (v).mean() for k,v in losses.items() } # Mean here because Dataparallel
                 loss = sum([losses[k] for k in losses])
 
-                wandb.log({"itr_Loss": loss})
-
                 # no_inf_mean removes some components from the loss, so make sure to backward through all of it
                 # all_loss = sum([v.mean() for v in losses.values()])
                 # Backprop
-                loss.backward() # Do this to free up vram even if loss is not finite
+                if cfg.use_amp:
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()  # Do this to free up vram even if loss is not finite
+
+
                 if torch.isfinite(loss).item():
                     optimizer.step()
                 
@@ -346,7 +383,7 @@ def train():
                     
                     print(('[%3d] %7d ||' + (' %s: %.3f |' * len(losses)) + ' T: %.3f || ETA: %s || timer: %.3f')
                             % tuple([epoch, iteration] + loss_labels + [total, eta_str, elapsed]), flush=True)
-                    wandb.log({"Avg_Loss": loss_labels})
+                    wandb.log({"Avg_Loss": total})
                 if args.log:
                     precision = 5
                     loss_info = {k: round(losses[k].item(), precision) for k in losses}
@@ -373,6 +410,8 @@ def train():
                         if args.keep_latest_interval <= 0 or iteration % args.keep_latest_interval != args.save_interval:
                             print('Deleting old save...')
                             os.remove(latest)
+            print('Saving state, iter:', iteration)
+            yolact_net.save_weights(save_path(epoch, iteration))
             
             # This is done per epoch
             if args.validation_epoch > 0:

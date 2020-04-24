@@ -26,6 +26,11 @@ use_jit = torch.cuda.device_count() <= 1
 if not use_jit:
     print('Multiple GPUs detected! Turning off JIT.')
 
+# AMP does not support TorchScript https://github.com/NVIDIA/apex/issues/303
+elif cfg.use_amp:
+    use_jit = False
+    print("Using AMP, JIT disabled")
+
 ScriptModuleWrapper = torch.jit.ScriptModule if use_jit else nn.Module
 script_method_wrapper = torch.jit.script_method if use_jit else lambda fn, _rcn=None: fn
 
@@ -338,7 +343,7 @@ class FPN(ScriptModuleWrapper):
         j = len(convouts)
         for pred_layer in self.pred_layers:
             j -= 1
-            out[j] = pred_layer(out[j])
+            out[j] = pred_layer(out[j].half())
 
             if self.relu_pred_layers:
                 F.relu(out[j], inplace=True)
@@ -399,7 +404,7 @@ class Yolact(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.backbone = construct_backbone(cfg.backbone)
+        self.backbone = construct_backbone(cfg.backbone, cfg.use_amp)
 
         if cfg.freeze_bn:
             self.freeze_bn()
