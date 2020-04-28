@@ -177,7 +177,8 @@ class CustomDataParallel(nn.DataParallel):
 def train():
     if not os.path.exists(args.save_folder):
         os.mkdir(args.save_folder)
-
+    print(cfg.dataset.train_info)
+    print(cfg.dataset.valid_info)
     dataset = COCODetection(image_path=cfg.dataset.train_images,
                             info_file=cfg.dataset.train_info,
                             transform=SSDAugmentation(MEANS))
@@ -191,7 +192,7 @@ def train():
     # Parallel wraps the underlying module, but when saving and loading we don't want that
     yolact_net = Yolact()
 
-    wandb.watch(yolact_net)
+    #wandb.watch(yolact_net)
 
     net = yolact_net
     net.train()
@@ -317,8 +318,6 @@ def train():
                 losses = { k: (v).mean() for k,v in losses.items() } # Mean here because Dataparallel
                 loss = sum([losses[k] for k in losses])
 
-                wandb.log({"itr_Loss": loss})
-
                 # no_inf_mean removes some components from the loss, so make sure to backward through all of it
                 # all_loss = sum([v.mean() for v in losses.values()])
                 # Backprop
@@ -346,7 +345,7 @@ def train():
                     
                     print(('[%3d] %7d ||' + (' %s: %.3f |' * len(losses)) + ' T: %.3f || ETA: %s || timer: %.3f')
                             % tuple([epoch, iteration] + loss_labels + [total, eta_str, elapsed]), flush=True)
-                    wandb.log({"Avg_Loss": loss_labels})
+                    wandb.log({"Avg_Loss": total})
                 if args.log:
                     precision = 5
                     loss_info = {k: round(losses[k].item(), precision) for k in losses}
@@ -366,8 +365,8 @@ def train():
                     if args.keep_latest:
                         latest = SavePath.get_latest(args.save_folder, cfg.name)
 
-                    print('Saving state, iter:', iteration)
-                    yolact_net.save_weights(save_path(epoch, iteration))
+                    # print('Saving state, iter:', iteration)
+                    # yolact_net.save_weights(save_path(epoch, iteration))
 
                     if args.keep_latest and latest is not None:
                         if args.keep_latest_interval <= 0 or iteration % args.keep_latest_interval != args.save_interval:
@@ -377,7 +376,10 @@ def train():
             # This is done per epoch
             if args.validation_epoch > 0:
                 if epoch % args.validation_epoch == 0 and epoch > 0:
+                    wandb.log({"Epoch": epoch})
                     compute_validation_map(epoch, iteration, yolact_net, val_dataset, log if args.log else None, wandb)
+                    print('Saving state, iter:', iteration)
+                    yolact_net.save_weights(save_path(epoch, iteration))
         
         # Compute validation mAP after training is finished
         compute_validation_map(epoch, iteration, yolact_net, val_dataset, log if args.log else None, wandb)

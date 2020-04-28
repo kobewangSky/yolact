@@ -123,6 +123,7 @@ class COCODetection(data.Dataset):
                     target.remove(target[i])
 
 
+
         # Separate out crowd annotations. These are annotations that signify a large crowd of
         # objects of said class, where there is no annotation for each individual object. Both
         # during testing and training, consider these crowds as neutral.
@@ -171,7 +172,7 @@ class COCODetection(data.Dataset):
                 
                 target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
             else:
-                img, _, _, _ = self.transform(img, np.zeros((1, height, width), dtype=np.float), np.array([[0.0, 0.0, 1.0, 1.0]]),
+                img, _, _, _ = self.transform(img, np.zeros((1, height, width), dtype=np.float), np.array([[0, 0, 1, 1]]),
                     {'num_crowds': 0, 'labels': np.array([0])})
                 masks = None
                 target = None
@@ -283,8 +284,6 @@ def detection_collate(batch):
     num_crowds = []
 
     for sample in batch:
-        if sample[0] == None:
-            continue
         imgs.append(sample[0])
         targets.append(torch.FloatTensor(sample[1][0]))
         masks.append(torch.FloatTensor(sample[1][1]))
