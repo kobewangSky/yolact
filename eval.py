@@ -1003,7 +1003,7 @@ def evaluate(net:Yolact, dataset, train_mode=False):
         print('Stopping...')
 
 
-def calc_map(ap_data, the_class_i_want=1):
+def calc_map(ap_data, the_class_i_want=0):
     print('Calculating mAP...')
     aps = [{'box': [], 'mask': []} for _ in iou_thresholds]
 
@@ -1014,10 +1014,11 @@ def calc_map(ap_data, the_class_i_want=1):
 
                 if not ap_obj.is_empty():
                     aps[iou_idx][iou_type].append(ap_obj.get_ap())
-    ################
-    ### addition ###
-    ################
-        if _class == 0:
+
+            ################
+            ### addition ###
+            ################
+        if _class == the_class_i_want:
             all_maps = {'box': OrderedDict(), 'mask': OrderedDict()}
             for iou_type in ('box', 'mask'):
                 all_maps[iou_type]['all'] = 0  # Make this first in the ordereddict
@@ -1028,9 +1029,9 @@ def calc_map(ap_data, the_class_i_want=1):
                             sum(all_maps[iou_type].values()) / (len(all_maps[iou_type].values()) - 1))
             print('#################### Class:', cfg.dataset.class_names[_class], '####################')
             print_maps(all_maps)
-    ####################
-    ### addition end ###
-    ####################
+        ####################
+        ### addition end ###
+        ####################
 
     all_maps = {'box': OrderedDict(), 'mask': OrderedDict()}
 
