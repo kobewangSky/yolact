@@ -495,8 +495,8 @@ coco_base_config = Config({
     'augment_random_rot90': False,
 
     # Discard detections with width and height smaller than this (in absolute width and height)
-    'discard_box_width': 4 / 550,
-    'discard_box_height': 4 / 550,
+    'discard_box_width': 4 / 512,
+    'discard_box_height': 4 / 512,
 
     # If using batchnorm anywhere in the backbone, freeze the batchnorm layer during training.
     # Note: any additional batch norm layers after the backbone will not be frozen.
@@ -785,6 +785,19 @@ yolact_plus_base_config = yolact_base_config.copy({
     'rescore_mask': True,
 
     'discard_mask_area': 5*5,
+
+
+    'max_size':512
+})
+
+yolact_plus_im512_config = yolact_plus_base_config.copy({
+    'name': 'yolact_plus_im512',
+
+    'masks_to_train': 300,
+    'max_size': 512,
+    'backbone': yolact_plus_base_config.backbone.copy({
+        'pred_scales': [[int(x[0] / yolact_plus_base_config.max_size * 512)] for x in yolact_base_config.backbone.pred_scales],
+    }),
 })
 
 yolact_plus_resnet50_config = yolact_plus_base_config.copy({
