@@ -68,7 +68,7 @@ class Detect(object):
             conf_preds = conf_data.view(batch_size, num_priors, self.num_classes).transpose(2, 1).contiguous()
 
             for batch_idx in range(batch_size):
-                decoded_boxes = decode(loc_data[batch_idx], prior_data)
+                decoded_boxes = decode(loc_data[batch_idx], prior_data.half())
                 result = self.detect(batch_idx, conf_preds, decoded_boxes, mask_data, inst_data)
 
                 if result is not None and proto_data is not None:

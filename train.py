@@ -309,7 +309,11 @@ def train():
                 # Adjust the learning rate at the given iterations, but also if we resume from past that iteration
                 while step_index < len(cfg.lr_steps) and iteration >= cfg.lr_steps[step_index]:
                     step_index += 1
-                    set_lr(optimizer, args.lr * (args.gamma ** step_index))
+
+                    temp = args.lr * (args.gamma ** step_index)
+                    set_lr(optimizer, temp)
+
+                    wandb.log({"Learning rate": temp})
                 
                 # Zero the grad to get ready to compute gradients
                 optimizer.zero_grad()

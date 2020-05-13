@@ -41,7 +41,12 @@ class Bottleneck(nn.Module):
         out = self.bn1(out)
         out = self.relu(out)
 
-        out = self.conv2(out)
+        # out = self.conv2(out)
+        if isinstance(self.conv2, DCN):
+            out = self.conv2(out.float()).half()
+        else:
+            out = self.conv2(out)
+
         out = self.bn2(out)
         out = self.relu(out)
 
@@ -126,7 +131,7 @@ class ResNetBackbone(nn.Module):
     def forward(self, x):
         """ Returns a list of convouts for each layer. """
 
-        x = self.conv1(x)
+        x = self.conv1(x.half())
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)

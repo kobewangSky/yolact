@@ -29,6 +29,12 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 
+try:
+    from dcn_v2 import DCN
+except ImportError:
+    def DCN(*args, **kwdargs):
+        raise Exception('DCN could not be imported. If you want to use YOLACT++ models, compile DCN. Check the README for instructions.')
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -595,16 +601,15 @@ def badhash(x):
 def evalimage(net:Yolact, path:str, save_path:str=None):
     frame = torch.from_numpy(cv2.imread(path)).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
+    #preds = net(batch)
 
     preds = net(batch)
-
-    # preds = net(batch)
-    # import time
-    # start = time.time()
-    # for i in range(100):
-    #     preds = net(batch)
-    # end = time.time()
-    # print((end - start)/100)
+    import time
+    start = time.time()
+    for i in range(1000):
+        preds = net(batch)
+    end = time.time()
+    print((end - start)/1000)
 
 
     img_numpy = prep_display(preds, frame, None, None, undo_transform=False)
@@ -952,10 +957,12 @@ def evaluate(net:Yolact, dataset, train_mode=False):
                     np.save('scripts/gt.npy', gt_masks)
 
                 batch = Variable(img.unsqueeze(0))
+
                 if args.cuda:
                     batch = batch.cuda()
 
             with timer.env('Network Extra'):
+                batch = batch.half()
                 preds = net(batch)
             # Perform the meat of the operation here depending on our mode.
             if args.display:
@@ -1111,6 +1118,11 @@ if __name__ == '__main__':
 
         if args.cuda:
             net = net.cuda()
+        net = net.half()
+        for _, module in net.backbone.layers._modules.items():
+            for _, block in module._modules.items():
+                if hasattr(block, 'conv2') and isinstance(block.conv2, DCN):
+                    block.conv2.float()
 
         evaluate(net, dataset)
 

@@ -317,7 +317,7 @@ class FPN(ScriptModuleWrapper):
         """
 
         out = []
-        x = torch.zeros(1, device=convouts[0].device)
+        x = torch.zeros(1, device=convouts[0].device).half()
         for i in range(len(convouts)):
             out.append(x)
 
@@ -369,7 +369,7 @@ class FastMaskIoUNet(ScriptModuleWrapper):
         self.maskiou_net, _ = make_net(input_channels, cfg.maskiou_net + last_layer, include_last_relu=True)
 
     def forward(self, x):
-        x = self.maskiou_net(x)
+        x = self.maskiou_net(x.half())
         maskiou_p = F.max_pool2d(x, kernel_size=x.size()[2:]).squeeze(-1).squeeze(-1)
 
         return maskiou_p
@@ -480,6 +480,7 @@ class Yolact(nn.Module):
 
         # For backward compatability, remove these (the new variable is called layers)
         for key in list(state_dict.keys()):
+            print(key)
             if key.startswith('backbone.layer') and not key.startswith('backbone.layers'):
                 del state_dict[key]
         
