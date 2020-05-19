@@ -1,4 +1,4 @@
-from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone
+from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone, EfficientNet
 from math import sqrt
 import torch
 
@@ -145,7 +145,7 @@ coco2017_testdev_dataset = dataset_base.copy({
 StoreEvaluation = dataset_base.copy({
     'name': 'Store Evaluation',
 
-    'train_info': './data/coco/annotations/Virtualdata_V1_instances_train2017_.json',
+    'train_info': './data/coco/annotations/Virtualdata_V1_Virtualdata_V2_instances_train2017_.json',
     'valid_info': './data/evaluation/annotations/StoreEvaluation.json',
 
     'label_map': COCO_LABEL_MAP
@@ -229,6 +229,14 @@ resnet101_backbone = backbone_base.copy({
     'selected_layers': list(range(2, 8)),
     'pred_scales': [[1]]*6,
     'pred_aspect_ratios': [ [[0.66685089, 1.7073535, 0.87508774, 1.16524493, 0.49059086]] ] * 6,
+})
+
+Effiction_backbone = backbone_base.copy({
+    'name': 'Effiction_Net',
+    'path': 'Effiction_Net_reducedfc.pth',
+    'type': EfficientNet,
+    'transform': resnet_transform,
+    'selected_layers': list(range(1, 3)),
 })
 
 resnet101_gn_backbone = backbone_base.copy({
@@ -800,12 +808,21 @@ yolact_plus_im512_config = yolact_plus_base_config.copy({
     }),
 })
 
+yolact_plus_im512_Efficent_config = yolact_plus_base_config.copy({
+    'name': 'yolact_plus_Efficent',
+
+    'backbone': Effiction_backbone.copy({
+    'pred_aspect_ratios': [ [[1, 1/2, 2]] ]*5,
+    'pred_scales': [[24], [48], [96], [192], [384]],
+    })
+})
+
 yolact_plus_resnet50_config = yolact_plus_base_config.copy({
     'name': 'yolact_plus_resnet50',
 
     'backbone': resnet50_dcnv2_backbone.copy({
         'selected_layers': list(range(1, 4)),
-        
+
         'pred_aspect_ratios': [ [[1, 1/2, 2]] ]*5,
         'pred_scales': [[i * 2 ** (j / 3.0) for j in range(3)] for i in [24, 48, 96, 192, 384]],
         'use_pixel_scales': True,
@@ -813,6 +830,8 @@ yolact_plus_resnet50_config = yolact_plus_base_config.copy({
         'use_square_anchors': False,
     }),
 })
+
+
 
 
 # Default config

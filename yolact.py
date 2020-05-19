@@ -427,9 +427,9 @@ class Yolact(nn.Module):
             if cfg.mask_proto_bias:
                 cfg.mask_dim += 1
 
-
-        self.selected_layers = cfg.backbone.selected_layers
         src_channels = self.backbone.channels
+        self.selected_layers = cfg.backbone.selected_layers
+
 
         if cfg.use_maskiou:
             self.maskiou_net = FastMaskIoUNet()
@@ -492,6 +492,7 @@ class Yolact(nn.Module):
     def init_weights(self, backbone_path):
         """ Initialize weights for training. """
         # Initialize the backbone with the pretrained weights.
+
         self.backbone.init_backbone(backbone_path)
 
         conv_constants = getattr(nn.Conv2d(1, 1, 1), '__constants__')

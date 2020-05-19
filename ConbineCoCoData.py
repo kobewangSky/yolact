@@ -70,11 +70,11 @@ def CombineCoCoData(path):
             temp_annotations = labels['annotations']
             for i in range(len(temp_images)):
                 temp_images[i]['file_name'] = os.path.join('..', Image_dirs[idx], temp_images[i]['file_name'])
-                temp_images[i]['id'] = int(temp_images[i]['id']) + temp_id
+                temp_images[i]['id'] = int(temp_images[i]['id']) + temp_id + 1
                 if temp_images[i]['id'] > max_id:
                     max_id = temp_images[i]['id']
             for i in range(len(temp_annotations)):
-                temp_annotations[i]['image_id'] = int(temp_annotations[i]['image_id']) + temp_id
+                temp_annotations[i]['image_id'] = int(temp_annotations[i]['image_id']) + temp_id + 1
                 temp_annotations[i]['id'] = '{}'.format(anotation_id)
                 anotation_id = anotation_id + 1
                 # temp_annotations[i]['id'] = int(temp_annotations[i]['id']) + len(output_annotations)
