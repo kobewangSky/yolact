@@ -236,7 +236,7 @@ Effiction_backbone = backbone_base.copy({
     'path': 'Effiction_Net_reducedfc.pth',
     'type': EfficientNet,
     'transform': resnet_transform,
-    'selected_layers': list(range(1, 3)),
+    'selected_layers': list(range(1, 4)),
 })
 
 resnet101_gn_backbone = backbone_base.copy({
