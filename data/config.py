@@ -233,7 +233,7 @@ resnet101_backbone = backbone_base.copy({
 
 Effiction_backbone = backbone_base.copy({
     'name': 'Effiction_Net',
-    'path': 'Effiction_Net_reducedfc.pth',
+    'path': 'efficientdet-d2.pth',
     'type': EfficientNet,
     'transform': resnet_transform,
     'selected_layers': list(range(1, 4)),
@@ -503,8 +503,8 @@ coco_base_config = Config({
     'augment_random_rot90': False,
 
     # Discard detections with width and height smaller than this (in absolute width and height)
-    'discard_box_width': 4 / 512,
-    'discard_box_height': 4 / 512,
+    'discard_box_width': 4 / 768,
+    'discard_box_height': 4 / 768,
 
     # If using batchnorm anywhere in the backbone, freeze the batchnorm layer during training.
     # Note: any additional batch norm layers after the backbone will not be frozen.
@@ -808,12 +808,12 @@ yolact_plus_im512_config = yolact_plus_base_config.copy({
     }),
 })
 
-yolact_plus_im512_Efficent_config = yolact_plus_base_config.copy({
+yolact_plus_im768_Efficent2D_config = yolact_plus_base_config.copy({
     'name': 'yolact_plus_Efficent',
-
+    'max_size': 768,
     'backbone': Effiction_backbone.copy({
-    'pred_aspect_ratios': [ [[1, 1/2, 2]] ]*5,
     'pred_scales': [[24], [48], [96], [192], [384]],
+    'pred_aspect_ratios': [ [[1, 1/2, 2]] ]*5,
     })
 })
 

@@ -7,8 +7,7 @@ from collections import OrderedDict
 
 from torch.nn import functional as F
 
-
-
+from efficientdet.model import BiFPN, Regressor, Classifier, EfficientNet
 
 
 try:
@@ -219,32 +218,6 @@ class ResNetBackboneGN(ResNetBackbone):
         
         # strict=False because we may have extra unitialized layers at this point
         self.load_state_dict(new_state_dict, strict=False)
-
-
-class EfficientNet(nn.Module):
-    def __init__(self, ):
-        super(EfficientNet, self).__init__()
-        model = EffNet.from_pretrained('efficientnet-b7')
-        self.channels = [256, 512, 1024, 2048]
-        del model._conv_head
-        del model._bn1
-        del model._avg_pooling
-        del model._dropout
-        del model._fc
-        self.model = model
-
-    def forward(self, x):
-        x = self.model._swish(self.model._bn0(self.model._conv_stem(x)))
-        feature_maps = []
-        for idx, block in enumerate(self.model._blocks):
-            drop_connect_rate = self.model._global_params.drop_connect_rate
-            if drop_connect_rate:
-                drop_connect_rate *= float(idx) / len(self.model._blocks)
-            x = block(x, drop_connect_rate=drop_connect_rate)
-            if block._depthwise_conv.stride == [2, 2]:
-                feature_maps.append(x)
-
-        return feature_maps[1:]
 
 
 
@@ -471,20 +444,126 @@ class VGGBackbone(nn.Module):
         self.in_channels = conv_channels*2
         self.channels.append(self.in_channels)
         self.layers.append(layer)
-        
-                
+
+
+class EfficientDetBackbone(nn.Module):
+    def __init__(self, compound_coef=0, load_weights=False, **kwargs):
+        super(EfficientDetBackbone, self).__init__()
+        self.compound_coef = compound_coef
+
+        self.backbone_compound_coef = [0, 1, 2, 3, 4, 5, 6, 6]
+        self.fpn_num_filters = [64, 88, 112, 160, 224, 288, 384, 384]
+        self.fpn_cell_repeats = [3, 4, 5, 6, 7, 7, 8, 8]
+        self.input_sizes = [512, 640, 768, 896, 1024, 1280, 1280, 1536]
+        self.box_class_repeats = [3, 3, 3, 4, 4, 4, 5, 5]
+        self.anchor_scale = [4., 4., 4., 4., 4., 4., 4., 5.]
+        self.aspect_ratios = kwargs.get('ratios', [(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)])
+        self.num_scales = len(kwargs.get('scales', [2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]))
+        conv_channel_coef = {
+            # the channels of P3/P4/P5.
+            0: [40, 112, 320],
+            1: [40, 112, 320],
+            2: [48, 120, 352],
+            3: [48, 136, 384],
+            4: [56, 160, 448],
+            5: [64, 176, 512],
+            6: [72, 200, 576],
+            7: [72, 200, 576],
+        }
+
+        self.bifpn = nn.Sequential(
+            *[BiFPN(self.fpn_num_filters[self.compound_coef],
+                    conv_channel_coef[compound_coef],
+                    True if _ == 0 else False,
+                    attention=True if compound_coef < 6 else False)
+              for _ in range(self.fpn_cell_repeats[compound_coef])])
+
+        self.backbone_net = EfficientNet(self.backbone_compound_coef[compound_coef], load_weights)
+
+        self.conv3 = nn.Conv2d(112, 256, kernel_size=1, stride=1, padding=0)
+        self.bn3 = nn.BatchNorm2d(256)
+
+        self.conv4 = nn.Conv2d(112, 256, kernel_size=1, stride=1, padding=0)
+        self.bn4 = nn.BatchNorm2d(256)
+
+        self.conv5 = nn.Conv2d(112, 256, kernel_size=1, stride=1, padding=0)
+        self.bn5 = nn.BatchNorm2d(256)
+
+        self.conv6 = nn.Conv2d(112, 256, kernel_size=1, stride=1, padding=0)
+        self.bn6 = nn.BatchNorm2d(256)
+
+        self.conv7 = nn.Conv2d(112, 256, kernel_size=1, stride=1, padding=0)
+        self.bn7 = nn.BatchNorm2d(256)
+
+        self.relu = nn.ReLU(inplace=True)
+
+        # layer = nn.Sequential(
+        #     nn.Conv2d(112, 256, kernel_size=1),
+        #     nn.BatchNorm2d(256),
+        #     nn.ReLU(inplace=True),
+        #
+        # )
+        # self.rechannellayer = []
+        # for i in range(5):
+        #     self.rechannellayer.append(layer)
+
+    def freeze_bn(self):
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()
+
+    def forward(self, inputs):
+
+        _, p3, p4, p5 = self.backbone_net(inputs)
+
+        features = (p3, p4, p5)
+        c3, c4, c5, c6, c7 = self.bifpn(features)
+
+        c3 = self.conv3(c3)
+        c3 = self.bn3(c3)
+        c3 = self.relu(c3)
+
+        c4 = self.conv4(c4)
+        c4 = self.bn4(c4)
+        c4 = self.relu(c4)
+
+        c5 = self.conv5(c5)
+        c5 = self.bn5(c5)
+        c5 = self.relu(c5)
+
+        c6 = self.conv6(c6)
+        c6 = self.bn6(c6)
+        c6 = self.relu(c6)
+
+        c7 = self.conv7(c7)
+        c7 = self.bn7(c7)
+        c7 = self.relu(c7)
+
+
+        # output = []
+        # for id, it in enumerate(features):
+        #     output.append(self.rechannellayer[id](it))
+
+        return c3, c4, c5, c6, c7
+
+    def init_backbone(self, path):
+        state_dict = torch.load(path)
+        try:
+            ret = self.load_state_dict(state_dict, strict=False)
+            print(ret)
+        except RuntimeError as e:
+            print('Ignoring ' + str(e) + '"')
 
 
 def construct_backbone(cfg):
     """ Constructs a backbone given a backbone config object (see config.py). """
-    if cfg.type == EfficientNet:
-        backbone = EfficientNet()
-    else:
-        backbone = cfg.type(*cfg.args)
-        # Add downsampling layers until we reach the number we need
-        num_layers = max(cfg.selected_layers) + 1
+    backbone = EfficientDetBackbone(compound_coef = 2 )
 
-        while len(backbone.layers) < num_layers:
-            backbone.add_layer()
+    # backbone = cfg.type(*cfg.args)
+    # # Add downsampling layers until we reach the number we need
+    # num_layers = max(cfg.selected_layers) + 1
+    #
+    # while len(backbone.layers) < num_layers:
+    #     backbone.add_layer()
 
     return backbone

@@ -17,6 +17,8 @@ import torch.backends.cudnn as cudnn
 from utils import timer
 from utils.functions import MovingAverage, make_net
 
+from efficientdet.model import BiFPN, Regressor, Classifier, EfficientNet
+
 # This is required for Pytorch 1.0.1 on Windows to initialize Cuda on some driver versions.
 # See the bug report here: https://github.com/pytorch/pytorch/issues/17108
 torch.cuda.current_device()
@@ -427,19 +429,21 @@ class Yolact(nn.Module):
             if cfg.mask_proto_bias:
                 cfg.mask_dim += 1
 
-        src_channels = self.backbone.channels
-        self.selected_layers = cfg.backbone.selected_layers
+        #src_channels = self.backbone.channels
+        #self.selected_layers = cfg.backbone.selected_layers
 
 
         if cfg.use_maskiou:
             self.maskiou_net = FastMaskIoUNet()
 
-        if cfg.fpn is not None:
-            # Some hacky rewiring to accomodate the FPN
-            self.fpn = FPN([src_channels[i] for i in self.selected_layers])
-            self.selected_layers = list(range(len(self.selected_layers) + cfg.fpn.num_downsample))
-            src_channels = [cfg.fpn.num_features] * len(self.selected_layers)
+        # if cfg.fpn is not None:
+        #     # Some hacky rewiring to accomodate the FPN
+        #     self.fpn = FPN([src_channels[i] for i in self.selected_layers])
+        #     self.selected_layers = list(range(len(self.selected_layers) + cfg.fpn.num_downsample))
+        #     src_channels = [cfg.fpn.num_features] * len(self.selected_layers)
 
+        self.selected_layers = [0, 1, 2, 3, 4]
+        src_channels = [256, 256, 256, 256, 256]
 
         self.prediction_layers = nn.ModuleList()
         cfg.num_heads = len(self.selected_layers)
@@ -495,57 +499,57 @@ class Yolact(nn.Module):
 
         self.backbone.init_backbone(backbone_path)
 
-        conv_constants = getattr(nn.Conv2d(1, 1, 1), '__constants__')
-        
-        # Quick lambda to test if one list contains the other
-        def all_in(x, y):
-            for _x in x:
-                if _x not in y:
-                    return False
-            return True
-
-        # Initialize the rest of the conv layers with xavier
-        for name, module in self.named_modules():
-            # See issue #127 for why we need such a complicated condition if the module is a WeakScriptModuleProxy
-            # Broke in 1.3 (see issue #175), WeakScriptModuleProxy was turned into just ScriptModule.
-            # Broke in 1.4 (see issue #292), where RecursiveScriptModule is the new star of the show.
-            # Note that this might break with future pytorch updates, so let me know if it does
-            is_script_conv = False
-            if 'Script' in type(module).__name__:
-                # 1.4 workaround: now there's an original_name member so just use that
-                if hasattr(module, 'original_name'):
-                    is_script_conv = 'Conv' in module.original_name
-                # 1.3 workaround: check if this has the same constants as a conv module
-                else:
-                    is_script_conv = (
-                        all_in(module.__dict__['_constants_set'], conv_constants)
-                        and all_in(conv_constants, module.__dict__['_constants_set']))
-            
-            is_conv_layer = isinstance(module, nn.Conv2d) or is_script_conv
-
-            if is_conv_layer and module not in self.backbone.backbone_modules:
-                nn.init.xavier_uniform_(module.weight.data)
-
-                if module.bias is not None:
-                    if cfg.use_focal_loss and 'conf_layer' in name:
-                        if not cfg.use_sigmoid_focal_loss:
-                            # Initialize the last layer as in the focal loss paper.
-                            # Because we use softmax and not sigmoid, I had to derive an alternate expression
-                            # on a notecard. Define pi to be the probability of outputting a foreground detection.
-                            # Then let z = sum(exp(x)) - exp(x_0). Finally let c be the number of foreground classes.
-                            # Chugging through the math, this gives us
-                            #   x_0 = log(z * (1 - pi) / pi)    where 0 is the background class
-                            #   x_i = log(z / c)                for all i > 0
-                            # For simplicity (and because we have a degree of freedom here), set z = 1. Then we have
-                            #   x_0 =  log((1 - pi) / pi)       note: don't split up the log for numerical stability
-                            #   x_i = -log(c)                   for all i > 0
-                            module.bias.data[0]  = np.log((1 - cfg.focal_loss_init_pi) / cfg.focal_loss_init_pi)
-                            module.bias.data[1:] = -np.log(module.bias.size(0) - 1)
-                        else:
-                            module.bias.data[0]  = -np.log(cfg.focal_loss_init_pi / (1 - cfg.focal_loss_init_pi))
-                            module.bias.data[1:] = -np.log((1 - cfg.focal_loss_init_pi) / cfg.focal_loss_init_pi)
-                    else:
-                        module.bias.data.zero_()
+        # conv_constants = getattr(nn.Conv2d(1, 1, 1), '__constants__')
+        #
+        # # Quick lambda to test if one list contains the other
+        # def all_in(x, y):
+        #     for _x in x:
+        #         if _x not in y:
+        #             return False
+        #     return True
+        #
+        # # Initialize the rest of the conv layers with xavier
+        # for name, module in self.named_modules():
+        #     # See issue #127 for why we need such a complicated condition if the module is a WeakScriptModuleProxy
+        #     # Broke in 1.3 (see issue #175), WeakScriptModuleProxy was turned into just ScriptModule.
+        #     # Broke in 1.4 (see issue #292), where RecursiveScriptModule is the new star of the show.
+        #     # Note that this might break with future pytorch updates, so let me know if it does
+        #     is_script_conv = False
+        #     if 'Script' in type(module).__name__:
+        #         # 1.4 workaround: now there's an original_name member so just use that
+        #         if hasattr(module, 'original_name'):
+        #             is_script_conv = 'Conv' in module.original_name
+        #         # 1.3 workaround: check if this has the same constants as a conv module
+        #         else:
+        #             is_script_conv = (
+        #                 all_in(module.__dict__['_constants_set'], conv_constants)
+        #                 and all_in(conv_constants, module.__dict__['_constants_set']))
+        #
+        #     is_conv_layer = isinstance(module, nn.Conv2d) or is_script_conv
+        #
+        #     if is_conv_layer and module not in self.backbone.backbone_modules:
+        #         nn.init.xavier_uniform_(module.weight.data)
+        #
+        #         if module.bias is not None:
+        #             if cfg.use_focal_loss and 'conf_layer' in name:
+        #                 if not cfg.use_sigmoid_focal_loss:
+        #                     # Initialize the last layer as in the focal loss paper.
+        #                     # Because we use softmax and not sigmoid, I had to derive an alternate expression
+        #                     # on a notecard. Define pi to be the probability of outputting a foreground detection.
+        #                     # Then let z = sum(exp(x)) - exp(x_0). Finally let c be the number of foreground classes.
+        #                     # Chugging through the math, this gives us
+        #                     #   x_0 = log(z * (1 - pi) / pi)    where 0 is the background class
+        #                     #   x_i = log(z / c)                for all i > 0
+        #                     # For simplicity (and because we have a degree of freedom here), set z = 1. Then we have
+        #                     #   x_0 =  log((1 - pi) / pi)       note: don't split up the log for numerical stability
+        #                     #   x_i = -log(c)                   for all i > 0
+        #                     module.bias.data[0]  = np.log((1 - cfg.focal_loss_init_pi) / cfg.focal_loss_init_pi)
+        #                     module.bias.data[1:] = -np.log(module.bias.size(0) - 1)
+        #                 else:
+        #                     module.bias.data[0]  = -np.log(cfg.focal_loss_init_pi / (1 - cfg.focal_loss_init_pi))
+        #                     module.bias.data[1:] = -np.log((1 - cfg.focal_loss_init_pi) / cfg.focal_loss_init_pi)
+        #             else:
+        #                 module.bias.data.zero_()
     
     def train(self, mode=True):
         super().train(mode)
@@ -571,11 +575,11 @@ class Yolact(nn.Module):
         with timer.env('backbone'):
             outs = self.backbone(x)
 
-        if cfg.fpn is not None:
-            with timer.env('fpn'):
-                # Use backbone.selected_layers because we overwrote self.selected_layers
-                outs = [outs[i] for i in cfg.backbone.selected_layers]
-                outs = self.fpn(outs)
+        # if cfg.fpn is not None:
+        #     with timer.env('fpn'):
+        #         # Use backbone.selected_layers because we overwrote self.selected_layers
+        #         outs = [outs[i] for i in cfg.backbone.selected_layers]
+        #         outs = self.fpn(outs)
 
         proto_out = None
         if cfg.mask_type == mask_type.lincomb and cfg.eval_mask_branch:
