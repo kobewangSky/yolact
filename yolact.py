@@ -429,7 +429,8 @@ class Yolact(nn.Module):
 
 
         self.selected_layers = cfg.backbone.selected_layers
-        src_channels = self.backbone.channels
+        #src_channels = self.backbone.channels
+        src_channels = [256, 512, 768, 1024]
 
         if cfg.use_maskiou:
             self.maskiou_net = FastMaskIoUNet()
@@ -487,6 +488,11 @@ class Yolact(nn.Module):
             if key.startswith('fpn.downsample_layers.'):
                 if cfg.fpn is not None and int(key.split('.')[2]) >= cfg.fpn.num_downsample:
                     del state_dict[key]
+        if 'maskiou_net.0.weight' not in list(state_dict.keys()) and cfg.use_maskiou:
+            for mask_Iou_key in list(self.maskiou_net.state_dict()):
+                state_dict['maskiou_net.' + mask_Iou_key] = self.maskiou_net.state_dict()[mask_Iou_key]
+
+
         self.load_state_dict(state_dict)
 
     def init_weights(self, backbone_path):
@@ -573,7 +579,7 @@ class Yolact(nn.Module):
         if cfg.fpn is not None:
             with timer.env('fpn'):
                 # Use backbone.selected_layers because we overwrote self.selected_layers
-                outs = [outs[i] for i in cfg.backbone.selected_layers]
+                outs = [outs[i] for i in ['stage3', 'stage4', 'stage5']]
                 outs = self.fpn(outs)
 
         proto_out = None

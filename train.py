@@ -304,12 +304,14 @@ def train():
                 if cfg.lr_warmup_until > 0 and iteration <= cfg.lr_warmup_until:
                     temp = (args.lr - cfg.lr_warmup_init) * (iteration / cfg.lr_warmup_until) + cfg.lr_warmup_init
                     set_lr(optimizer, temp)
-                    wandb.log({"Learning rate": temp})
+
 
                 # Adjust the learning rate at the given iterations, but also if we resume from past that iteration
                 while step_index < len(cfg.lr_steps) and iteration >= cfg.lr_steps[step_index]:
                     step_index += 1
-                    set_lr(optimizer, args.lr * (args.gamma ** step_index))
+                    temp2 = args.lr * (args.gamma ** step_index)
+                    set_lr(optimizer, temp2)
+                    wandb.log({"Learning rate": temp2})
                 
                 # Zero the grad to get ready to compute gradients
                 optimizer.zero_grad()
@@ -347,6 +349,10 @@ def train():
                     
                     print(('[%3d] %7d ||' + (' %s: %.3f |' * len(losses)) + ' T: %.3f || ETA: %s || timer: %.3f')
                             % tuple([epoch, iteration] + loss_labels + [total, eta_str, elapsed]), flush=True)
+
+                    for it in losses:
+                        wandb.log({it :losses[it].item()})
+
                     wandb.log({"Avg_Loss": total})
                 if args.log:
                     precision = 5

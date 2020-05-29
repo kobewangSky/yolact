@@ -1,4 +1,5 @@
 from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone
+from vovnet import VoVNet
 from math import sqrt
 import torch
 
@@ -92,6 +93,8 @@ dataset_base = Config({
 
     # Validation images and annotations.
     'valid_images': './data/evaluation/images/',
+    #'valid_images': './data/coco/images/',
+
     'valid_info':   'path_to_annotation_file',
 
     # Whether or not to load GT. If this is False, eval.py quantitative evaluation won't work.
@@ -142,11 +145,13 @@ coco2017_testdev_dataset = dataset_base.copy({
     'label_map': COCO_LABEL_MAP
 })
 
+
 StoreEvaluation = dataset_base.copy({
     'name': 'Store Evaluation',
 
     'train_info': './data/coco/annotations/Virtualdata_V1_instances_train2017_.json',
     'valid_info': './data/evaluation/annotations/StoreEvaluation.json',
+    #'valid_info': './data/coco/annotations/instances_val2017.json',
 
     'label_map': COCO_LABEL_MAP
 })
@@ -271,6 +276,21 @@ darknet53_backbone = backbone_base.copy({
     'selected_layers': list(range(3, 9)),
     'pred_scales': [[3.5, 4.95], [3.6, 4.90], [3.3, 4.02], [2.7, 3.10], [2.1, 2.37], [1.8, 1.92]],
     'pred_aspect_ratios': [ [[1, sqrt(2), 1/sqrt(2), sqrt(3), 1/sqrt(3)][:n], [1]] for n in [3, 5, 5, 5, 3, 3] ],
+})
+
+Vovnet_backbone = resnet101_backbone.copy({
+    'name': 'VoVNet_Net',
+    'path': 'vovnet39_ese_detectron2.pth',
+    'type': VoVNet,
+    'transform': resnet_transform,
+
+    'selected_layers': list(range(1, 4)),
+
+    'pred_aspect_ratios': [[[1, 1 / 2, 2]]] * 5,
+    'pred_scales': [[i * 2 ** (j / 3.0) for j in range(3)] for i in [24, 48, 96, 192, 384]],
+    'use_pixel_scales': True,
+    'preapply_sqrt': False,
+    'use_square_anchors': False,
 })
 
 vgg16_arch = [[64, 64],
@@ -798,6 +818,23 @@ yolact_plus_im512_config = yolact_plus_base_config.copy({
     'backbone': yolact_plus_base_config.backbone.copy({
         'pred_scales': [[int(x[0] / yolact_plus_base_config.max_size * 512)] for x in yolact_base_config.backbone.pred_scales],
     }),
+})
+
+yolact_plus_im512_VoVonet_config = yolact_plus_base_config.copy({
+    'name': 'yolact_plus_im512_VoVonet',
+
+    'masks_to_train': 300,
+    'max_size': 512,
+    'backbone': Vovnet_backbone.copy({
+        'CONV_BODY': 'V-39-eSE',
+        'NORM':'FrozenBN',
+        'STAGE_WITH_DCN' : (False, False, False, False),
+        'WITH_MODULATED_DCN':False,
+        'DEFORMABLE_GROUPS' : 1,
+        'FREEZE_AT':0
+    }),
+
+    'use_maskiou': False,
 })
 
 yolact_plus_resnet50_config = yolact_plus_base_config.copy({

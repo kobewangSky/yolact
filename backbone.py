@@ -4,6 +4,8 @@ import pickle
 
 from collections import OrderedDict
 
+from vovnet import VoVNet
+
 try:
     from dcn_v2 import DCN
 except ImportError:
@@ -448,12 +450,14 @@ class VGGBackbone(nn.Module):
 
 def construct_backbone(cfg):
     """ Constructs a backbone given a backbone config object (see config.py). """
-    backbone = cfg.type(*cfg.args)
+    # backbone = cfg.type(*cfg.args)
+    #
+    # # Add downsampling layers until we reach the number we need
+    # num_layers = max(cfg.selected_layers) + 1
+    #
+    # while len(backbone.layers) < num_layers:
+    #     backbone.add_layer()
 
-    # Add downsampling layers until we reach the number we need
-    num_layers = max(cfg.selected_layers) + 1
-
-    while len(backbone.layers) < num_layers:
-        backbone.add_layer()
+    backbone = VoVNet(cfg, 3, ['stage3', 'stage4', 'stage5'])
 
     return backbone
