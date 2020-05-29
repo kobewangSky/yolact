@@ -15,7 +15,7 @@ from backbone import construct_backbone
 
 import torch.backends.cudnn as cudnn
 from utils import timer
-from utils.functions import MovingAverage, make_net
+from utils.functions import MovingAverage, make_net, make_net_iou
 
 # This is required for Pytorch 1.0.1 on Windows to initialize Cuda on some driver versions.
 # See the bug report here: https://github.com/pytorch/pytorch/issues/17108
@@ -366,7 +366,7 @@ class FastMaskIoUNet(ScriptModuleWrapper):
         super().__init__()
         input_channels = 1
         last_layer = [(cfg.num_classes-1, 1, {})]
-        self.maskiou_net, _ = make_net(input_channels, cfg.maskiou_net + last_layer, include_last_relu=True)
+        self.maskiou_net = make_net_iou(input_channels, cfg.maskiou_net + last_layer, include_last_relu=True)
 
     def forward(self, x):
         x = self.maskiou_net(x)

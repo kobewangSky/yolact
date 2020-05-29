@@ -834,7 +834,8 @@ yolact_plus_im512_VoVonet_config = yolact_plus_base_config.copy({
         'FREEZE_AT':0
     }),
 
-    'use_maskiou': False,
+    'use_maskiou': True,
+    'maskiou_alpha': 5,
 })
 
 yolact_plus_resnet50_config = yolact_plus_base_config.copy({
