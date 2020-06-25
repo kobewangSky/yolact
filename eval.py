@@ -1,3 +1,7 @@
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 from data import COCODetection, get_label_map, MEANS, COLORS
 from yolact import Yolact
 from utils.augmentations import BaseTransform, FastBaseTransform, Resize
@@ -28,6 +32,8 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 import cv2
+
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -596,15 +602,21 @@ def evalimage(net:Yolact, path:str, save_path:str=None):
     frame = torch.from_numpy(cv2.imread(path)).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
 
-    preds = net(batch)
+    batch = torch.cat((batch, batch))
+    batch = torch.cat((batch, batch))
+    batch = torch.cat((batch, batch))
+    batch = torch.cat((batch, batch))
+    batch = torch.cat((batch, batch))
 
-    # preds = net(batch)
-    # import time
-    # start = time.time()
-    # for i in range(100):
-    #     preds = net(batch)
-    # end = time.time()
-    # print((end - start)/100)
+    #preds = net(batch)
+
+    preds = net(batch)
+    import time
+    start = time.time()
+    for i in range(100):
+        preds = net(batch)
+    end = time.time()
+    print((end - start)/100)
 
 
     img_numpy = prep_display(preds, frame, None, None, undo_transform=False)

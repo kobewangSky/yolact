@@ -6,6 +6,7 @@ from utils import timer
 from data import cfg, mask_type
 
 import numpy as np
+import torchvision
 
 
 class Detect(object):
@@ -94,17 +95,29 @@ class Detect(object):
         if scores.size(1) == 0:
             return None
 
-        if self.use_fast_nms:
-            if self.use_cross_class_nms:
-                boxes, masks, classes, scores = self.cc_fast_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
-            else:
-                boxes, masks, classes, scores = self.fast_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
-        else:
-            boxes, masks, classes, scores = self.traditional_nms(boxes, masks, scores, self.nms_thresh,
-                                                                 self.conf_thresh)
+        _, idx = torch.squeeze(scores).sort(0, descending=True)
+        idx = idx[:self.top_k]
+        boxes = boxes[idx]
+        masks = masks[idx]
+        scores = torch.squeeze(scores)[idx]
 
-            if self.use_cross_class_nms:
-                print('Warning: Cross Class Traditional NMS is not implemented.')
+        index = torchvision.ops.nms(boxes, scores, self.nms_thresh)
+        boxes = boxes[index]
+        masks = masks[index]
+        classes = torch.zeros([len(index)], dtype=torch.int).cuda()
+        scores = torch.squeeze(scores)[index]
+
+
+        #if self.use_fast_nms:
+        #    if self.use_cross_class_nms:
+        #        boxes, masks, classes, scores = self.cc_fast_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
+        #    else:
+        #        boxes, masks, classes, scores = self.fast_nms(boxes, masks, scores, self.nms_thresh, self.top_k)
+        #else:
+        #    boxes, masks, classes, scores = self.traditional_nms(boxes, masks, scores, self.nms_thresh,
+        #                                                         self.conf_thresh)
+        #    if self.use_cross_class_nms:
+        #        print('Warning: Cross Class Traditional NMS is not implemented.')
 
         return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
 

@@ -92,8 +92,8 @@ dataset_base = Config({
     'train_info':   'path_to_annotation_file',
 
     # Validation images and annotations.
-    'valid_images': './data/evaluation/images/',
-    #'valid_images': './data/coco/images/',
+    #'valid_images': './data/evaluation/images/',
+    'valid_images': './data/coco/raw_images/',
 
     'valid_info':   'path_to_annotation_file',
 
@@ -149,8 +149,8 @@ coco2017_testdev_dataset = dataset_base.copy({
 StoreEvaluation = dataset_base.copy({
     'name': 'Store Evaluation',
 
-    'train_info': './data/coco/annotations/Virtualdata_V1_Virtualdata_V2_instances_train2017_instancesonly_filtered_gtFine_train_instancesonly_filtered_gtFine_val_.json',
-    'valid_info': './data/evaluation/annotations/StoreEvaluation.json',
+    'train_info': './data/coco/annotations/Virtualdata_V1_Virtualdata_V2_instances_train2017_instancesonly_filtered_gtFine_train_instancesonly_filtered_gtFine_val_voc_coco_.json',
+    'valid_info': './data/coco/annotations/labels.json',
     #'valid_info': './data/coco/annotations/instances_val2017.json',
 
     'label_map': COCO_LABEL_MAP
@@ -844,7 +844,7 @@ yolact_plus_resnet50_config = yolact_plus_base_config.copy({
         'selected_layers': list(range(1, 4)),
         
         'pred_aspect_ratios': [ [[1, 1/2, 2]] ]*5,
-        'pred_scales': [[i * 2 ** (j.0) for j in range(3)] for i in [24, 48, 96, 192, 384]],
+        'pred_scales': [[i * 2 ** (j / 3.0) for j in range(3)] for i in [24, 48, 96, 192, 384]],
         'use_pixel_scales': True,
         'preapply_sqrt': False,
         'use_square_anchors': False,

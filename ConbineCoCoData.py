@@ -7,8 +7,8 @@ import argparse
 
 def CombineCoCoData(path):
     Privacyname = 'images'
-    target_dirs = ['Virtualdata_V1', 'Virtualdata_V2', 'instances_train2017', 'instancesonly_filtered_gtFine_train', 'instancesonly_filtered_gtFine_val']
-    Image_dirs = ['Virtualdata_V1', 'Virtualdata_V2',  'images', 'cityscapes', 'cityscapes']
+    target_dirs = ['Virtualdata_V1', 'Virtualdata_V2', 'instances_train2017', 'instancesonly_filtered_gtFine_train', 'instancesonly_filtered_gtFine_val', 'voc_coco']
+    Image_dirs = ['Virtualdata_V1', 'Virtualdata_V2',  'images', 'cityscapes', 'cityscapes', 'JPEGImages']
     target_file = path
 
     Outputname = str()
