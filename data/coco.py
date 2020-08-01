@@ -146,6 +146,8 @@ class COCODetection(data.Dataset):
             file_name = file_name.split('_')[-1]
 
         path = osp.join(self.root, file_name)
+        if osp.exists(path) == False:
+            print("")
         assert osp.exists(path), 'Image path does not exist: {}'.format(path)
         
         img = cv2.imread(path)
@@ -153,7 +155,11 @@ class COCODetection(data.Dataset):
         
         if len(target) > 0:
             # Pool all the masks for this image into one [num_objects,height,width] matrix
-            masks = [self.coco.annToMask(obj).reshape(-1) for obj in target]
+            try:
+                masks = [self.coco.annToMask(obj).reshape(-1) for obj in target]
+            except Exception as e:
+                assert "errpr"
+
             masks = np.vstack(masks)
             masks = masks.reshape(-1, height, width)
 

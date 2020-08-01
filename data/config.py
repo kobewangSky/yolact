@@ -92,8 +92,8 @@ dataset_base = Config({
     'train_info':   'path_to_annotation_file',
 
     # Validation images and annotations.
-    #'valid_images': './data/evaluation/images/',
-    'valid_images': './data/coco/raw_images/',
+    'valid_images': './data/evaluation/images/',
+    #'valid_images': './data/coco/raw_images/',
 
     'valid_info':   'path_to_annotation_file',
 
@@ -149,7 +149,7 @@ coco2017_testdev_dataset = dataset_base.copy({
 StoreEvaluation = dataset_base.copy({
     'name': 'Store Evaluation',
 
-    'train_info': './data/coco/annotations/Virtualdata_V1_Virtualdata_V2_instances_train2017_instancesonly_filtered_gtFine_train_instancesonly_filtered_gtFine_val_voc_coco_.json',
+    'train_info': './data/coco/annotations/Virtualdata_V1_Virtualdata_V2_instances_train2017_instancesonly_filtered_gtFine_train_instancesonly_filtered_gtFine_val_voc_coco_coco_annotations_.json',
     'valid_info': './data/coco/annotations/labels.json',
     #'valid_info': './data/coco/annotations/instances_val2017.json',
 
@@ -278,7 +278,7 @@ darknet53_backbone = backbone_base.copy({
     'pred_aspect_ratios': [ [[1, sqrt(2), 1/sqrt(2), sqrt(3), 1/sqrt(3)][:n], [1]] for n in [3, 5, 5, 5, 3, 3] ],
 })
 
-Vovnet_backbone = resnet101_backbone.copy({
+Vovnet_backbone_39 = resnet101_backbone.copy({
     'name': 'VoVNet_Net',
     'path': 'vovnet39_ese_detectron2.pth',
     'type': VoVNet,
@@ -291,6 +291,35 @@ Vovnet_backbone = resnet101_backbone.copy({
     'use_pixel_scales': True,
     'preapply_sqrt': False,
     'use_square_anchors': False,
+
+    'CONV_BODY': 'V-39-eSE',
+    'NORM':'FrozenBN',
+    'STAGE_WITH_DCN' : (False, False, False, False),
+    'WITH_MODULATED_DCN':False,
+    'DEFORMABLE_GROUPS' : 1,
+    'FREEZE_AT':0
+})
+
+Vovnet_backbone_19 = resnet101_backbone.copy({
+    'name': 'VoVNet_Net',
+    'path': 'vovnet19_ese_detectron2.pth',
+    'type': VoVNet,
+    'transform': resnet_transform,
+
+    'selected_layers': list(range(1, 4)),
+
+    'pred_aspect_ratios': [[[1, 1 / 2, 2]]] * 5,
+    'pred_scales': [[i * 2 ** (j / 3.0) for j in range(3)] for i in [24, 48, 96, 192, 384]],
+    'use_pixel_scales': True,
+    'preapply_sqrt': False,
+    'use_square_anchors': False,
+
+    'CONV_BODY': 'V-19-eSE',
+    'NORM': 'FrozenBN',
+    'STAGE_WITH_DCN': (False, False, False, False),
+    'WITH_MODULATED_DCN': False,
+    'DEFORMABLE_GROUPS': 1,
+    'FREEZE_AT': 0
 })
 
 vgg16_arch = [[64, 64],
@@ -825,14 +854,10 @@ yolact_plus_im512_VoVonet_config = yolact_plus_base_config.copy({
 
     'masks_to_train': 300,
     'max_size': 512,
-    'backbone': Vovnet_backbone.copy({
-        'CONV_BODY': 'V-39-eSE',
-        'NORM':'FrozenBN',
-        'STAGE_WITH_DCN' : (False, False, False, False),
-        'WITH_MODULATED_DCN':False,
-        'DEFORMABLE_GROUPS' : 1,
-        'FREEZE_AT':0
-    }),
+    'backbone': Vovnet_backbone_19.copy(),
+
+    'lr_steps': (560000, 1200000, 1400000, 1500000),
+    'max_iter': 1600000,
 
     'use_maskiou': False,
 })
